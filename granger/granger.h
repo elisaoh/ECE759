@@ -47,7 +47,7 @@ struct GrangerParams {
   int p;
   int q;
   
-  DataT* mu = nullptr;
+  DataT* bias_len = nullptr;
   DataT* ar = nullptr;
   DataT* ma = nullptr;
   DataT* sar = nullptr;
@@ -68,7 +68,7 @@ struct GrangerParams {
   void allocate(const ARIMAOrder& order, int batch_size, AllocatorT& alloc,
                 cudaStream_t stream, bool tr = false) {
     if (order.k && !tr)
-      mu = (DataT*)alloc->allocate(batch_size * sizeof(DataT), stream);
+      bias_len = (DataT*)alloc->allocate(batch_size * sizeof(DataT), stream);
     if (order.p)
       ar =
         (DataT*)alloc->allocate(order.p * batch_size * sizeof(DataT), stream);
@@ -98,7 +98,7 @@ struct GrangerParams {
   void deallocate(const ARIMAOrder& order, int batch_size, AllocatorT& alloc,
                   cudaStream_t stream, bool tr = false) {
     if (order.k && !tr)
-      alloc->deallocate(mu, batch_size * sizeof(DataT), stream);
+      alloc->deallocate(bias_len, batch_size * sizeof(DataT), stream);
     if (order.p)
       alloc->deallocate(ar, order.p * batch_size * sizeof(DataT), stream);
     if (order.q)
@@ -116,7 +116,7 @@ struct GrangerParams {
    * @param[in]   order      ARIMA order
    * @param[in]   batch_size Batch size
    * @param[out]  param_vec  Linear array of all parameters grouped by batch
-   *                         [mu, ar, ma, sar, sma, sigma2] (device)
+   *                         [bias_len, ar, ma, sar, sma, sigma2] (device)
    * @param[in]  stream      CUDA stream
    */
   void pack(const ARIMAOrder& order, int batch_size, DataT* param_vec,
@@ -124,13 +124,13 @@ struct GrangerParams {
     int N = order.complexity();
     auto counting = thrust::make_counting_iterator(0);
     // The device lambda can't capture structure members...
-    const DataT *_mu = mu, *_ar = ar, *_ma = ma, *_sar = sar, *_sma = sma,
+    const DataT *_bias_len = bias_len, *_ar = ar, *_ma = ma, *_sar = sar, *_sma = sma,
                 *_sigma2 = sigma2;
     thrust::for_each(thrust::cuda::par.on(stream), counting,
                      counting + batch_size, [=] __device__(int bid) {
                        DataT* param = param_vec + bid * N;
                        if (order.k) {
-                         *param = _mu[bid];
+                         *param = _bias_len[bid];
                          param++;
                        }
                        for (int ip = 0; ip < order.p; ip++) {
@@ -159,7 +159,7 @@ struct GrangerParams {
    * @param[in]  order      ARIMA order
    * @param[in]  batch_size Batch size
    * @param[in]  param_vec  Linear array of all parameters grouped by batch
-   *                        [mu, ar, ma, sar, sma, sigma2] (device)
+   *                        [bias_len, ar, ma, sar, sma, sigma2] (device)
    * @param[in]  stream     CUDA stream
    */
   void unpack(const ARIMAOrder& order, int batch_size, const DataT* param_vec,
@@ -167,13 +167,13 @@ struct GrangerParams {
     int N = order.complexity();
     auto counting = thrust::make_counting_iterator(0);
     // The device lambda can't capture structure members...
-    DataT *_mu = mu, *_ar = ar, *_ma = ma, *_sar = sar, *_sma = sma,
+    DataT *_bias_len = bias_len, *_ar = ar, *_ma = ma, *_sar = sar, *_sma = sma,
           *_sigma2 = sigma2;
     thrust::for_each(thrust::cuda::par.on(stream), counting,
                      counting + batch_size, [=] __device__(int bid) {
                        const DataT* param = param_vec + bid * N;
                        if (order.k) {
-                         _mu[bid] = *param;
+                         _bias_len[bid] = *param;
                          param++;
                        }
                        for (int ip = 0; ip < order.p; ip++) {

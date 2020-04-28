@@ -42,8 +42,7 @@ void _granger_least_squares(cumlHandle& handle,
                          int p,  //p = max value of lag of x1's 
                          int q,  //q = max value of lag of x2's (q=p in our situation)
                          bool estimate, 
-                         int bias_len = 1, // here 
-                         double* weight = nullptr) {
+                         int bias_len = 1) {
 
   const auto& handle_impl = handle.getImpl();
   auto stream = handle_impl.getStream();
@@ -54,26 +53,19 @@ void _granger_least_squares(cumlHandle& handle,
   int batch_size = X1.batches();
   int n = X1.shape().first;
 
-  int r = p+q;
+  int r = p*2;
   int k = 1; 
-  if (estimate_sigma2) {
+  if (estimate) { 
     thrust::device_ptr<double> variance_thrust =
       thrust::device_pointer_cast(variance);
     thrust::fill(thrust::cuda::par.on(stream), variance_thrust,
                  variance_thrust + batch_size, 1.0);
   }
 
-
-  /* Matrix formed by lag matrices of y and the residuals respectively,
-   * side by side. The left side will be used to estimate AR, the right
-   * side to estimate MA */
-  MLCommon::LinAlg::Batched::Matrix<double> bm_ls_ar_res(
-    n - r, p + q + k, batch_size, cublas_handle, allocator, stream, false);
-  int ar_offset = r - p;
-  int res_offset = r - p - q;
-
-  // Create lagged matrix X1 
-  int ls_height = n - p;
+                         
+  // Create lagged matrix X1
+  int len = X1.shape().first * X1.shape().second;
+  int ls_height = len - p;
   MLCommon::LinAlg::Batched::Matrix<double> X1_mt =
     MLCommon::LinAlg::Batched::b_lagged_mat(X1, p);
 
@@ -84,12 +76,12 @@ void _granger_least_squares(cumlHandle& handle,
   //use only the last (p-1) columns for both X1 and X2 as A
   // X1_fit = X1[:,1:]; X2_fit = X2[:,1:];
   MLCommon::LinAlg::Batched::Matrix<double> X1_fit =
-    MLCommon::LinAlg::Batched::b_2dcopy(X1_mt, p*2, 0, ls_height, 1);
+    MLCommon::LinAlg::Batched::b_2dcopy(X1_mt, 0, 1, ls_height, p);
 
   MLCommon::LinAlg::Batched::Matrix<double> X2_fit =
-    MLCommon::LinAlg::Batched::b_2dcopy(X2_mt, p*2, 0, ls_height, 1);
+    MLCommon::LinAlg::Batched::b_2dcopy(X2_mt, 0, 1, ls_height, p);
 
-
+  // now size of X_fit is (n-p)x(p-1)
   // put X1 and X2 together to be X = [X1:X2] (do we need to add bias?)
   // this "concatinate" function isn't finished yet
   MLCommon::LinAlg::Batched::Matrix<double> X_fit =
@@ -97,28 +89,25 @@ void _granger_least_squares(cumlHandle& handle,
 
   // Generate true outputs Y for the model fit
   MLCommon::LinAlg::Batched::Matrix<double> Y =
-    MLCommon::LinAlg::Batched::b_2dcopy(X1_mt, p*2, 0, ls_height, 1);
+    MLCommon::LinAlg::Batched::b_2dcopy(X1_mt, 0, 0, ls_height, 1);
 
 
   // initialize a residual
   MLCommon::LinAlg::Batched::Matrix<double> Y_residual(
-    n - r, 1, batch_size, cublas_handle, allocator, stream, false);
-  if (estimate_sigma2) {
+    n - p, 1, batch_size, cublas_handle, allocator, stream, false);
+  if (estimate) {
     MLCommon::copy(Y_residual.raw_data(), Y.raw_data(),
-                   (n - r) * batch_size, stream);
+                   (n - p) * batch_size, stream);
   }
 
-  // Initial AR fit
+  // use cublas to solve the least square
+  // the results are stored back to Y, while X_fit stores the QR factorized elems
   MLCommon::LinAlg::Batched::b_gels(X_fit, Y);
 
-  // Copy the results to the weight vectors
-  const double* weight_ori = Y.raw_data();
-  thrust::for_each(thrust::cuda::par.on(stream), counting,
-                   counting + batch_size, [=] __device__(int bid) {
-                     for (int i = 0; i < p+q + bias_len; i++) {
-                       weight[i] = weight_ori[i];
-                     }
-                   });
+  // Cut results into the weight vectors
+  MLCommon::LinAlg::Batched::Matrix<double> weight =
+    MLCommon::LinAlg::Batched::b_2dcopy(Y, 0, 0, ls_height, 1);
+
 
   if (estimate) {
     // Compute final residual (technically a gemv)
@@ -150,7 +139,7 @@ void _start_params(cumlHandle& handle, GrangerParams<double>& params,
 
   // Estimate a granger fit
     _granger_least_squares(handle, params.sigma2, X1, X2,
-                        params.p, params.q, true, params.bias_len, params.weight);
+                        params.p, params.q, true, params.bias_len);
 
 }
 
@@ -167,7 +156,7 @@ void estimate_x0(cumlHandle& handle, GrangerParams<double>& params,
   // prepare X1 and X2
   MLCommon::LinAlg::Batched::Matrix<double> X1(
     n, 1, 1, cublas_handle,allocator, stream, false);
-  MLCommon::LinAlg::Batched::Matrix<double> X1(
+  MLCommon::LinAlg::Batched::Matrix<double> X2(
     n, 1, 1, cublas_handle,allocator, stream, false);
   MLCommon::TimeSeries::prepare_data(X1.raw_data(), d_x1, batch_size, n, stream);
   MLCommon::TimeSeries::prepare_data(X2.raw_data(), d_x2, batch_size, n, stream);
