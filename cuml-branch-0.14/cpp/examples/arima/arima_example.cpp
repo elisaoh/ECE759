@@ -34,6 +34,7 @@
 
 #include <cuml/tsa/arima_common.h>
 #include <cuml/tsa/batched_arima.hpp>
+#include "time_series_datasets.h"
 #include <cuml/cuml.hpp>
 
 #ifndef CUDA_RT_CALL
@@ -168,6 +169,16 @@ int main(int argc, char* argv[]) {
 #endif  // HAVE_RMM
   cumlHandle.setDeviceAllocator(allocator);
 
+
+
+
+
+
+
+
+
+
+
   std::vector<float> h_inputData;
 
   if (input == "") {
@@ -206,6 +217,24 @@ int main(int argc, char* argv[]) {
     }
   }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+  
+
   cudaStream_t stream;
   CUDA_RT_CALL(cudaStreamCreate(&stream));
   cumlHandle.setStream(stream);
@@ -227,13 +256,12 @@ int main(int argc, char* argv[]) {
             << "eps - " << eps << std::endl
             << "max_bytes_per_batch - " << max_bytes_per_batch << std::endl;
 
-//   struct ARIMAParams {
-//   DataT* mu = nullptr;
-//   DataT* ar = nullptr;
-//   DataT* ma = nullptr;
-//   DataT* sar = nullptr;
-//   DataT* sma = nullptr;
-//   DataT* sigma2 = nullptr;}
+  struct ARIMAParams params;
+
+  struct ARIMAOrder order = {1,1,1,1,1,1,1,1};
+  int batch_size = 0;
+  int nobs = 0;
+
 
 //   struct ARIMAOrder {
 //   int p;  // Basic order
@@ -246,9 +274,8 @@ int main(int argc, char* argv[]) {
 //   int k;  // Fit intercept?
 // }
 
-  // ML::estimate_x0(cumlHandle, ARIMAParams<double>& params,
-  //                const double* d_y, int batch_size, int nobs,
-  //                const ARIMAOrder& order);
+  ML::estimate_x0(cumlHandle, params,
+                d_labels, batch_size, nobs, order);
 
   // ML::dbscanFit(cumlHandle, d_inputData, nRows, nCols, eps, minPts, d_labels,
   //               max_bytes_per_batch, false);
