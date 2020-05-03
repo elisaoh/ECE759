@@ -85,47 +85,29 @@ void printUsage() {
   return;
 }
 
-void loadDefaultDataset(std::vector<float>& inputData, size_t& nRows,
-                        size_t& nCols, int& minPts, float& eps,
-                        size_t& max_bytes_per_batch) {
-  constexpr size_t NUM_ROWS = 25;
-  constexpr size_t NUM_COLS = 3;
-  constexpr int MIN_PTS = 2;
-  constexpr float EPS = 1.0f;
+void loadDefaultDataset(std::vector<double>& h_x1, std::vector<double>& h_x2, size_t& nobs) {
+  constexpr size_t NUM_OBS = 10;
 
-  constexpr float data[NUM_ROWS * NUM_COLS] = {
-    -7.497668f, 9.218568f,  -4.924911f, 8.001691f,  -2.377415f, -3.496702f,
-    -7.402899f, 9.162857f,  -4.894407f, -7.590056f, 9.375731f,  -4.762814f,
-    7.822048f,  -2.388025f, -3.403690f, -7.376115f, 9.441934f,  -4.801385f,
-    -7.531280f, 9.230399f,  -4.763294f, 8.042177f,  -2.665680f, -3.316565f,
-    7.944115f,  -2.557312f, -3.185993f, 7.922114f,  -2.423922f, -3.194180f,
-    7.897527f,  -2.466402f, -3.311819f, -7.569343f, 9.266988f,  -4.779115f,
-    -7.528063f, 9.156666f,  -4.887371f, -7.296247f, 9.187418f,  -4.754778f,
-    7.825963f,  -2.351993f, -3.419239f, -7.608446f, 9.386856f,  -4.750009f,
-    8.087856f,  -2.330975f, -3.392595f, -7.503101f, 9.391059f,  -4.762857f,
-    7.936867f,  -2.410410f, -3.397487f, -7.565027f, 9.248172f,  -5.000937f,
-    -7.339392f, 9.317035f,  -4.778559f, 7.803362f,  -2.304214f, -3.173147f,
-    -7.510096f, 9.441537f,  -4.718324f, 8.025255f,  -2.585647f, -3.019001f,
-    7.957931f,  -2.547737f, -3.283212f};
-  nRows = NUM_ROWS;
-  nCols = NUM_COLS;
-  minPts = MIN_PTS;
-  eps = EPS;
-  max_bytes_per_batch = 0;  // allow algorithm to set this
+  constexpr double x1[NUM_OBS] = {1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0};
+  constexpr double x2[NUM_OBS] = {0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0};
 
-  inputData.insert(inputData.begin(), data, data + nRows * nCols);
+
+  nobs = NUM_OBS;
+  h_x1.insert(h_x1.begin(), x1, x1 + nobs);
+  h_x2.insert(h_x2.begin(), x2, x2 + nobs);
 }
 
 int main(int argc, char* argv[]) {
   int devId = get_argval<int>(argv, argv + argc, "-dev_id", 0);
-  size_t nRows = get_argval<size_t>(argv, argv + argc, "-num_samples", 0);
-  size_t nCols = get_argval<size_t>(argv, argv + argc, "-num_features", 0);
-  std::string input =
-    get_argval<std::string>(argv, argv + argc, "-input", std::string(""));
-  int minPts = get_argval<int>(argv, argv + argc, "-min_pts", 3);
-  float eps = get_argval<float>(argv, argv + argc, "-eps", 1.0f);
-  size_t max_bytes_per_batch =
-    get_argval<size_t>(argv, argv + argc, "-max_bytes_per_batch", (size_t)13e9);
+  size_t nobs = get_argval<size_t>(argv, argv + argc, "-num_samples", 0);
+  // size_t nRows = get_argval<size_t>(argv, argv + argc, "-num_samples", 0);
+  // size_t nCols = get_argval<size_t>(argv, argv + argc, "-num_features", 0);
+  // std::string input =
+  //   get_argval<std::string>(argv, argv + argc, "-input", std::string(""));
+  // int minPts = get_argval<int>(argv, argv + argc, "-min_pts", 3);
+  // float eps = get_argval<float>(argv, argv + argc, "-eps", 1.0f);
+  // size_t max_bytes_per_batch =
+  //   get_argval<size_t>(argv, argv + argc, "-max_bytes_per_batch", (size_t)13e9);
 
   {
     cudaError_t cudaStatus = cudaSuccess;
@@ -146,6 +128,7 @@ int main(int argc, char* argv[]) {
   // define a handle here
 
   ML::cumlHandle cumlHandle;
+
 
 #ifdef HAVE_RMM
   rmmOptions_t rmmOptions;
@@ -179,43 +162,44 @@ int main(int argc, char* argv[]) {
 
 
 
-  std::vector<float> h_inputData;
+  std::vector<double> h_x1;
+  std::vector<double> h_x2;
 
-  if (input == "") {
+
     // Samples file not specified, run with defaults
     std::cout << "Samples file not specified. (-input option)" << std::endl;
     std::cout << "Running with default dataset:" << std::endl;
-    loadDefaultDataset(h_inputData, nRows, nCols, minPts, eps,
-                       max_bytes_per_batch);
-  } else if (nRows == 0 || nCols == 0) {
-    // Samples file specified but nRows and nCols is not specified
-    // Print usage and quit
-    std::cerr << "Samples file: " << input << std::endl;
-    std::cerr << "Incorrect value for (num_samples x num_features): (" << nRows
-              << " x " << nCols << ")" << std::endl;
-    printUsage();
-    return 1;
-  } else {
-    // All options are correctly specified
-    // Try to read input file now
-    std::ifstream input_stream(input, std::ios::in);
-    if (!input_stream.is_open()) {
-      std::cerr << "ERROR: Could not open input file " << input << std::endl;
-      return 1;
-    }
-    std::cout << "Trying to read samples from " << input << std::endl;
-    h_inputData.reserve(nRows * nCols);
-    float val = 0.0;
-    while (input_stream >> val) {
-      h_inputData.push_back(val);
-    }
-    if (h_inputData.size() != nRows * nCols) {
-      std::cerr << "ERROR: Read " << h_inputData.size() << " from " << input
-                << ", while expecting to read: " << nRows * nCols
-                << " (num_samples*num_features)" << std::endl;
-      return 1;
-    }
-  }
+    loadDefaultDataset(h_x1, h_x2, nobs);
+ 
+    //else if (nRows == 0 || nCols == 0) {
+  //   // Samples file specified but nRows and nCols is not specified
+  //   // Print usage and quit
+  //   std::cerr << "Samples file: " << input << std::endl;
+  //   std::cerr << "Incorrect value for (num_samples x num_features): (" << nRows
+  //             << " x " << nCols << ")" << std::endl;
+  //   printUsage();
+  //   return 1;
+  // } else {
+  //   // All options are correctly specified
+  //   // Try to read input file now
+  //   std::ifstream input_stream(input, std::ios::in);
+  //   if (!input_stream.is_open()) {
+  //     std::cerr << "ERROR: Could not open input file " << input << std::endl;
+  //     return 1;
+  //   }
+  //   std::cout << "Trying to read samples from " << input << std::endl;
+  //   h_inputData.reserve(nRows * nCols);
+  //   float val = 0.0;
+  //   while (input_stream >> val) {
+  //     h_inputData.push_back(val);
+  //   }
+  //   if (h_inputData.size() != nRows * nCols) {
+  //     std::cerr << "ERROR: Read " << h_inputData.size() << " from " << input
+  //               << ", while expecting to read: " << nRows * nCols
+  //               << " (num_samples*num_features)" << std::endl;
+  //     return 1;
+  //   }
+  // }
 
 
 
@@ -227,22 +211,27 @@ int main(int argc, char* argv[]) {
   CUDA_RT_CALL(cudaStreamCreate(&stream));
   cumlHandle.setStream(stream);
 
-  std::vector<int> h_labels(nRows);
-  double* d_labels = nullptr;
-  float* d_inputData = nullptr;
+	double* d_x1 = nullptr;
+	double* d_x2 = nullptr;
 
-  CUDA_RT_CALL(cudaMalloc(&d_labels, nRows * sizeof(int)));
-  CUDA_RT_CALL(cudaMalloc(&d_inputData, nRows * nCols * sizeof(float)));
-  CUDA_RT_CALL(cudaMemcpyAsync(d_inputData, h_inputData.data(),
-                               nRows * nCols * sizeof(float),
+
+  CUDA_RT_CALL(cudaMalloc((void**)&d_x1, nobs * sizeof(double)));
+  CUDA_RT_CALL(cudaMalloc((void**)&d_x2, nobs * sizeof(double)));
+  CUDA_RT_CALL(cudaMemcpyAsync(d_x1, h_x1.data(),
+                               nobs * sizeof(double),
                                cudaMemcpyHostToDevice, stream));
+  CUDA_RT_CALL(cudaMemcpyAsync(d_x2, h_x2.data(),
+                               nobs * sizeof(double),
+                               cudaMemcpyHostToDevice, stream));
+	
+	double * h_back = new double[nobs];
 
-  std::cout << "Running ARIMA with following parameters:" << std::endl
-            << "Number of samples - " << nRows << std::endl
-            << "Number of features - " << nCols << std::endl
-            << "min_pts - " << minPts << std::endl
-            << "eps - " << eps << std::endl
-            << "max_bytes_per_batch - " << max_bytes_per_batch << std::endl;
+    CUDA_RT_CALL(cudaMemcpyAsync(h_back, d_x1,
+                               nobs * sizeof(double),
+                               cudaMemcpyDeviceToHost, stream));
+
+  std::cout <<"print h_x1 "<< *h_x1.begin() << std::endl;
+  std::cout <<"print h_back "<< *h_back << std::endl;
 
 
   ML::ARIMAParams<double> params;
@@ -251,32 +240,12 @@ int main(int argc, char* argv[]) {
 
   std::cout << gorder.p << std::endl;
   int batch_size = 1;
-  int nobs = 10;
-  double h_x1[10] = {1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0,10.0};
-  double h_x2[10] = {0.0,1.0,2.0,3.0,4.0,5.0,6.0,7.0,8.0,9.0};
-  double* d_x1;
-  double* d_x2;
 
-  CUDA_RT_CALL(cudaMalloc((void**)&d_x1, nobs * sizeof(double)));
-  CUDA_RT_CALL(cudaMalloc((void**)&d_x2, nobs * sizeof(double)));
-  CUDA_RT_CALL(cudaMemcpyAsync(d_x1, h_x1,
-                               nobs * sizeof(double),
-                               cudaMemcpyHostToDevice, stream));
-  CUDA_RT_CALL(cudaMemcpyAsync(d_x2, h_x2,
-                               nobs * sizeof(double),
-                               cudaMemcpyHostToDevice, stream));
-  // double d_x1[10][1] = {{1},{2},{3},{4},{5},{6},{7},{8},{9},{10}};
-  // double d_x2[10][1] = {{0},{1},{2},{3},{4},{5},{6},{7},{8},{9}};
-
-  std::printf("%f \n",h_x1[1]);
 
   ML::printsth(gorder);
-  ML::granger_causality_test(cumlHandle, gorder, d_x1, d_x2, batch_size, nobs);
+  // ML::granger_causality_test(cumlHandle, gorder, d_x1, d_x2, batch_size, nobs);
   
-  // ML::dbscanFit(cumlHandle, d_inputData, nRows, nCols, eps, minPts, d_labels,
-  //               max_bytes_per_batch, false);
-  // CUDA_RT_CALL(cudaMemcpyAsync(h_labels.data(), d_labels, nRows * sizeof(int),
-  //                              cudaMemcpyDeviceToHost, stream));
+
   CUDA_RT_CALL(cudaStreamSynchronize(stream));
 
 

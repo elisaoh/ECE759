@@ -32,8 +32,8 @@
 #include <cuml/common/rmmAllocatorAdapter.hpp>
 #endif  //HAVE_RMM
 
-#include <cuml/tsa/arima_common.h>
-#include <cuml/tsa/batched_arima.hpp>
+#include <cuml/tsa/granger_common.h>
+#include <cuml/tsa/granger.hpp>
 #include "time_series_datasets.h"
 #include <cuml/cuml.hpp>
 
