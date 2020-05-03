@@ -34,6 +34,7 @@ int main(){
 cublasHandle_t handle;
 int n = 4;
 int p = 3;
+int matrixSize = n*p;
 float X[n * p] = { 1.0, 1.0, 3.0, -2.0,
 					1.0, 2.0, -1.0, 3.0,
 					2.0, 1.0, 3.0, -1.0};
@@ -79,6 +80,7 @@ int *d_info_array;
 
 int batchSize = 1;
 
+
 //allocate pivoting vector and the info array
 
 CUDA_CALL(cudaMalloc((void **)&d_pivot_array, p * sizeof(int)));
@@ -86,7 +88,29 @@ CUDA_CALL(cudaMalloc((void **)&d_info_array, sizeof(int)));
 
 
 
-  CUBLAS_CALL(cublasSgetrfBatched(handle, p, dXtX, p, d_pivot_array, d_info_array, batchSize));
+float **devPtrA = 0;
+float **devPtrA_dev = NULL;
+
+
+devPtrA =(float **)malloc(1 * sizeof(*devPtrA));
+	if (devPtrA == NULL)
+	{ perror("malloc"); exit(EXIT_FAILURE); }
+
+CUDA_CALL(cudaMalloc((void **) devPtrA, matrixSize * sizeof(*X)));
+CUDA_CALL(cudaMalloc((void **) &devPtrA_dev, 1 * sizeof(*devPtrA)));
+
+CUDA_CALL(cudaMemcpy(devPtrA_dev, devPtrA, 1 * sizeof(*devPtrA), cudaMemcpyHostToDevice));
+CUBLAS_CALL(cublasSetMatrix(n, p, sizeof(a[0]), dXtX, n, devPtrA[0], n));
+
+
+// // this works
+// cublascall(cublasDgetrfBatched(handle, m, devPtrA_dev,m,d_pivot_array,d_info_array,1));
+
+// cublascall(cublasGetMatrix(m, n, sizeof(double), devPtrA[0], m, a, m));
+
+
+
+  CUBLAS_CALL(cublasSgetrfBatched(handle, p, devPtrA_dev, p, d_pivot_array, d_info_array, batchSize));
 
 
 //reversion
