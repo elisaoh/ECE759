@@ -85,6 +85,11 @@ int main(int argc, char*argv[])
  printf("lag_matrix = (matlab base-1)\n");
  printMatrix(lda, m, lag_matrix, lda, "lag_matrix");
  printf("=====\n");
+	
+ printf("lag_x1 = (matlab base-1)\n");
+ printMatrix(lda, p_lag, lag_x1, lda, "lag_matrix");
+ printf("=====\n");
+
  printf("y_label = (matlab base-1)\n");
  printMatrix(ldb, nrhs, y_label, ldb, "y_label");
  printf("=====\n");
