@@ -51,10 +51,10 @@ int main(int argc, char*argv[])
  int rows = x_len - p_lag; // rows of the lag matrix
  int cols = p_lag*2 + bias;
  
- double lag_matrix[rows * cols];
  double lag_x1[rows * p_lag+1];
  double y_label[rows];
-
+ double lag_matrix[rows * cols];
+	
  int threads_per_block = 512;
 
  gen_lag_matrix(x1, x2, lag_matrix, lag_x1, y_label, bias, x_len, p_lag, rows, cols, threads_per_block);
