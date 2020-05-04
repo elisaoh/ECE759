@@ -4,7 +4,9 @@ example [ref](https://docs.nvidia.com/cuda/archive/10.1/pdf/CUSOLVER_Library.pdf
 run with 
 
 `nvcc test.cpp ols.cpp -lcublas -lcusolver -o test `
-` test`
+
+
+` ./test`
 
 
 function Ols
