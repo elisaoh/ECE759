@@ -44,7 +44,7 @@ void gen_lag_matrix(const double* x1, const double* x2, double* lag_matrix, doub
     cudaMallocManaged((void**)&d_x1, sizeof(double)*n);
     cudaMallocManaged((void**)&d_x2, sizeof(double)*n);
     cudaMallocManaged((void**)&d_matrix_lag, sizeof(double)*(rows*cols));
-    cudaMallocManaged((void**)&d_x1_lag, sizeof(double)*(rows*(p+1))+;
+    cudaMallocManaged((void**)&d_x1_lag, sizeof(double)*(rows*(p+1)));
     cudaMallocManaged((void**)&d_label, sizeof(double)*rows);
 
     cudaMemcpy(d_x1, x1, sizeof(double)*n, cudaMemcpyHostToDevice);
