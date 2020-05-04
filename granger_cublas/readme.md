@@ -1,8 +1,12 @@
 # How to run ormqr
 example [ref](https://docs.nvidia.com/cuda/archive/10.1/pdf/CUSOLVER_Library.pdf) P224
-I don't know why
-`nvcc -c -I/usr/local/cuda/include ormqr_example.cpp`
 
-`nvcc -o a.out ormqr_example.o -lcudart -lcublas -lcusolver`
+run with 
 
-`./a.out`
+`nvcc test.cpp ols.cpp -lcublas -lcusolver -o test `
+` test`
+
+
+function Ols
+
+A and B is stored in col major, i.e. index = row + col*n_of_rows(leading dimension)
