@@ -4,6 +4,7 @@ Granger added to arima related files.
 
 No extra files so as to avoid other problems.
 
+--------------------------------------------
 
 How to run the example (standalone ver.)
 
