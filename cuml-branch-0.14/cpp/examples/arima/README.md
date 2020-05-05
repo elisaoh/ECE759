@@ -46,7 +46,7 @@ Noise samples: 0
 ```
 
 2. Run with non-trivial dataset:
-To use `dbscan_example` on non-trivial datasets, first input file needs to be prepared. If the dataset has N samples with M features each, the input file needs to be and ASCII file with N\*M rows with features linearized as below,
+To use `arima_example` on non-trivial datasets, first input file needs to be prepared. If the dataset has N samples with M features each, the input file needs to be and ASCII file with N\*M rows with features linearized as below,
 ```
 sample-0-feature-0
 sample-0-feature-1
