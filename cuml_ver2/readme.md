@@ -1,8 +1,8 @@
-# this is modified version of cuml
-# granger added to arima related files
-# No extra files so as to avoid other problems
+this is modified version of cuml
+granger added to arima related files
+No extra files so as to avoid other problems
 
-# How to run the example (standalone ver.)
+How to run the example (standalone ver.)
 0. **I have already done this**
  In cuml/cpp/examples/arima, rename "CMakeList_standalone.txt" as "CMakeList.txt"
 In "CMakeList.txt" replace **dbscan_example** with **arima_example**
