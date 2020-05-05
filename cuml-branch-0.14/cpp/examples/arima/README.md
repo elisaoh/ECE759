@@ -1,4 +1,4 @@
-# DBSCAN
+# ARIMA
 This example code demonstrates use of C++ API of cuML DBSCAN. It requires `libcuml.so` in order to build.
 
 ## Build
@@ -9,19 +9,19 @@ The example can be build either as part of cuML or can also be build as a standa
 2. `CMakeLists_standalone.txt` - To be used for building example standalone
 
 ### Standalone build
-While building standalone use `CMakeLists_standalone.txt` and configure with:
+While building standalone use `CMakeLists.txt` (You are not suppose to rename CMakeLists_standalone.txt to CMakeLists.txt because we have down that for you) and configure with:
 ```bash
 $ cmake .. -DCUML_LIBRARY_DIR=/path/to/libcuml.so -DCUML_INCLUDE_DIR=/path/to/cuml/headers
 ```
 then build with `make`
 ```bash
 $ make
-[ 50%] Building CXX object CMakeFiles/dbscan_example.dir/dbscan_example.cpp.o
+[ 50%] Building CXX object CMakeFiles/arsima_example.dir/arima_example.cpp.o
 
-[100%] Linking CUDA executable dbscan_example
-[100%] Built target dbscan_example
+[100%] Linking CUDA executable arima_example
+[100%] Built target arima_example
 ```
-On successful build, example should build `dbscan_example` binary.
+On successful build, example should build `arima_example` binary.
 
 ## Run
 
