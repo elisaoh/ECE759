@@ -1,11 +1,18 @@
 this is modified version of cuml. 
+
 Granger added to arima related files. 
+
 No extra files so as to avoid other problems.
 
+
 How to run the example (standalone ver.)
+
 0. **I have already done this**
+
  In cuml/cpp/examples/arima, rename "CMakeList_standalone.txt" as "CMakeList.txt"
+ 
 In "CMakeList.txt" replace **dbscan_example** with **arima_example**
+
 1. activate conda enviroment(if built with conda)
    `conda activate cuml_dev`
 2. cd into the *arima* directory
