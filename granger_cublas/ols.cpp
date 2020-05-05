@@ -6,6 +6,7 @@
 #include <cublas_v2.h>
 #include <cusolverDn.h>
 
+
 double Ols(const int m, const int lda, const int ldb,
 	const int nrhs, double *A, double *B, double *Bhat){
 
@@ -67,6 +68,15 @@ double Ols(const int m, const int lda, const int ldb,
  int info_gpu = 0;
  const double one = 1;
  const double minus = -1;
+
+
+
+cudaEvent_t start;
+cudaEvent_t stop;
+cudaEventCreate(&start);
+cudaEventCreate(&stop);
+
+cudaEventRecord(start);
 
 	// step 3: query working space of geqrf and ormqr
  cusolver_status = cusolverDnDgeqrf_bufferSize(
@@ -146,6 +156,16 @@ double ssr = 0.0;
  	cublasH, CUBLAS_OP_N, CUBLAS_OP_N, lda, nrhs, m, &one, dd_A, lda, d_B, m, &minus, dd_B, ldb);
  cublas_status = cublasDnrm2(cublasH, ldb,
                             dd_B, 1, &ssr);
+
+cudaEventRecord(stop);
+cudaEventSynchronize(stop);
+float ms;
+cudaEventElapsedTime(&ms, start, stop);
+
+
+ printf("OLS time: %f ms \n", ms);
+
+
 
  cudaStat1 = cudaDeviceSynchronize();
  assert(CUBLAS_STATUS_SUCCESS == cublas_status);
