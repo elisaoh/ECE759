@@ -1,6 +1,6 @@
-this is modified version of cuml
-granger added to arima related files
-No extra files so as to avoid other problems
+this is modified version of cuml. 
+Granger added to arima related files. 
+No extra files so as to avoid other problems.
 
 How to run the example (standalone ver.)
 0. **I have already done this**
