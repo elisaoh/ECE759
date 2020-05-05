@@ -1,24 +1,29 @@
 /*
  * How to compile (assume cuda is installed at /usr/local/cuda/)
- * nvcc -c -I/usr/local/cuda/include ormqr_example.cpp
- * nvcc -o -fopenmp a.out ormqr_example.o -L/usr/local/cuda/lib64 -lcudart -lcublas -lcusolver
- * 
 
- nvcc -c -I/usr/local/cuda/include ormqr_example.cpp
- *nvcc -o a.out ormqr_example.o -lcudart -lcublas -lcusolver
- ./a.out
-
-
- nvcc test.cpp ols.cpp -lcublas -lcusolver -o test
+nvcc test_v2.cpp ols.cpp gen_lag_matrix.cu -lcublas -lcusolver -o test_v2
  */
+
+
+// The std::chrono namespace provides timer functions in C++
+#include <chrono>
+
+// std::ratio provides easy conversions between metric units
+#include <ratio>
 #include "ols.h"
+#include "Chi2PLookup.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <cuda_runtime.h>
 #include <cublas_v2.h>
+#include <cmath>
 #include <cusolverDn.h>
+#include <fstream>
 #include "gen_lag_matrix.cuh"
+
+using std::chrono::high_resolution_clock;
+using std::chrono::duration;
 
 void printMatrix(int m, int n, const double*A, int lda, const char* name)
 {
@@ -33,29 +38,50 @@ void printMatrix(int m, int n, const double*A, int lda, const char* name)
 
 int main(int argc, char*argv[])
 {
- cusolverDnHandle_t cusolverH = NULL;
- cublasHandle_t cublasH = NULL;
- cublasStatus_t cublas_status = CUBLAS_STATUS_SUCCESS;
- cusolverStatus_t cusolver_status = CUSOLVER_STATUS_SUCCESS;
- cudaError_t cudaStat1 = cudaSuccess;
- cudaError_t cudaStat2 = cudaSuccess;
- cudaError_t cudaStat3 = cudaSuccess;
- cudaError_t cudaStat4 = cudaSuccess;
 
- int x_len = 8; // length of the inputs
- double x1[x_len] = { 1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0};
- double x2[x_len] = { 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0};
+const int x_len = atoi(argv[1]); // length of the inputs
+ double x1[x_len];
+ std::ifstream x1_file("x1.txt");
+  if(x1_file.is_open())
+    { for(int i = 0; i < x_len; ++i)
+        {
+            x1_file >> x1[i];
+        }
+    }
+
+double x2[x_len];
+ std::ifstream x2_file("x2.txt");
+  if(x2_file.is_open())
+    { for(int i = 0; i < x_len; ++i)
+        {
+            x2_file >> x2[i];
+        }
+    }
+
+
+ // double x1[x_len] = { 1.0, 2.0, 3.0, 4.0, 7.0, 6.0, 7.0, 8.0};
+ // double x2[x_len] = { 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0};
 
  double bias = 1.0; // bias = 1 or 0
- int p_lag = 2; // lag length
+ int p_lag = 1; // lag length
  int rows = x_len - p_lag; // rows of the lag matrix
  int cols = p_lag*2 + bias;
  
- double lag_matrix[rows * cols];
  double lag_x1[rows * p_lag+1];
  double y_label[rows];
+  double lag_matrix[rows * cols];
+ double y_joint[rows];
+double y_own[rows];
 
  int threads_per_block = 512;
+
+
+high_resolution_clock::time_point start;
+high_resolution_clock::time_point end;
+duration<double, std::milli> duration_sec;
+
+// Get the starting timestamp
+start = high_resolution_clock::now();
 
  gen_lag_matrix(x1, x2, lag_matrix, lag_x1, y_label, bias, x_len, p_lag, rows, cols, threads_per_block);
 
@@ -74,71 +100,59 @@ int main(int argc, char*argv[])
  */
 
  double XC[m*nrhs]; // solution matrix from GPU
- double *d_A = NULL; // linear memory of GPU
- double *d_tau = NULL; // linear memory of GPU
- double *d_B = NULL;
- int *devInfo = NULL; // info in gpu (device copy)
- double *d_work = NULL;
- // int lwork = 0;
- // int info_gpu = 0;
- // const double one = 1;
- printf("lag_matrix = (matlab base-1)\n");
- printMatrix(lda, m, lag_matrix, lda, "lag_matrix");
- printf("=====\n");
 
- printf("lag_x1 = (matlab base-1)\n");
- printMatrix(lda, p_lag+1, lag_x1, lda, "lag_matrix");
- printf("=====\n");
+ // printf("lag_matrix = (matlab base-1)\n");
+ // printMatrix(lda, m, lag_matrix, lda, "lag_matrix");
+ // printf("=====\n");
 
- printf("y_label = (matlab base-1)\n");
- printMatrix(ldb, nrhs, y_label, ldb, "y_label");
- printf("=====\n");
+ // printf("lag_x1 = (matlab base-1)\n");
+ // printMatrix(lda, p_lag+1, lag_x1, lda, "lag_matrix");
+ // printf("=====\n");
 
-// step 1: create cusolver/cublas handle
- cusolver_status = cusolverDnCreate(&cusolverH);
- assert(CUSOLVER_STATUS_SUCCESS == cusolver_status);
- cublas_status = cublasCreate(&cublasH);
- assert(CUBLAS_STATUS_SUCCESS == cublas_status);
+ // printf("y_label = (matlab base-1)\n");
+ // printMatrix(ldb, nrhs, y_label, ldb, "y_label");
+ // printf("=====\n");
 
 
 
-
-// step 2: copy A and B to device
- cudaStat1 = cudaMalloc ((void**)&d_A , sizeof(double) * lda * m);
- cudaStat2 = cudaMalloc ((void**)&d_tau, sizeof(double) * m);
- cudaStat3 = cudaMalloc ((void**)&d_B , sizeof(double) * ldb * nrhs);
- cudaStat4 = cudaMalloc ((void**)&devInfo, sizeof(int));
- assert(cudaSuccess == cudaStat1);
- assert(cudaSuccess == cudaStat2);
- assert(cudaSuccess == cudaStat3);
- assert(cudaSuccess == cudaStat4);
- cudaStat1 = cudaMemcpy(d_A, lag_matrix, sizeof(double) * lda * m ,
- cudaMemcpyHostToDevice);
- cudaStat2 = cudaMemcpy(d_B, y_label, sizeof(double) * ldb * nrhs ,
- cudaMemcpyHostToDevice);
- assert(cudaSuccess == cudaStat1);
- assert(cudaSuccess == cudaStat2);
+double ssr_joint = 1;
+double ssr_own = 1;
+ssr_joint = Ols(m, lda, ldb, nrhs, lag_matrix, y_label, y_joint);
+ // printf("y_label = (matlab base-1)\n");
+ // printMatrix(ldb, nrhs, y_joint, ldb, "y_label");
+ // printf("=====\n");
 
 
-Ols(cudaStat1, cusolver_status, cublas_status, cusolverH, cublasH, 
-	m, lda, ldb, nrhs, d_A, d_B, d_tau, d_work, 
-	devInfo);
+ssr_own = Ols(p_lag+1, lda, ldb, nrhs, lag_x1, y_label, y_own);
+ // printf("y_label = (matlab base-1)\n");
+ // printMatrix(ldb, nrhs, y_own, ldb, "y_label");
+ // printf("=====\n");
+
+ printf("ssr joint %f \n", ssr_joint);
+ printf("ssr own %f \n", ssr_own);
 
 
- cudaStat1 = cudaMemcpy(XC, d_B, sizeof(double)*m*nrhs,
- cudaMemcpyDeviceToHost);
- assert(cudaSuccess == cudaStat1);
- printf("X = (matlab base-1)\n");
- printMatrix(m, nrhs, XC, ldb, "X");
+ double x_chi2 = rows*(ssr_own - ssr_joint) / ssr_joint;
+
+ double p_value = 1.0;
+
+ if (x_chi2 > 0)
+ {
+ 	 Chi2PLookup Chi2PLookupTable;
+ 	 p_value = Chi2PLookupTable.getPValue(x_chi2, p_lag);
+ }
+
+    end = high_resolution_clock::now();
+    duration_sec = std::chrono::duration_cast<duration<double, std::milli>>(end - start);
+
+ printf("chi2x  %f  P value %f \n ", x_chi2, p_value);
+
+ printf("Total time: %f ms \n", duration_sec.count());
+
+
+
 // free resources
- if (d_A ) cudaFree(d_A);
- if (d_tau ) cudaFree(d_tau);
- if (d_B ) cudaFree(d_B);
- if (devInfo) cudaFree(devInfo);
- if (d_work ) cudaFree(d_work);
- if (cublasH ) cublasDestroy(cublasH);
- if (cusolverH) cusolverDnDestroy(cusolverH);
- cudaDeviceReset();
+
  return 0;
 }
 
